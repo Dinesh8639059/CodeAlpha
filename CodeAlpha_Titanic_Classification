@@ -1,0 +1,121 @@
+# 1. Introduction
+# This code aims to build a classification model to predict the survival of passengers on the Titanic.
+
+# 2. Dataset Overview
+# The dataset includes features such as PassengerId, Pclass, Name, Sex, Age, SibSp, Parch, Ticket, Fare, Embarked, etc.
+
+# 3. Data Loading
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Load the dataset
+data = pd.read_csv('tested.csv')
+
+# 4. Data Exploration and Visualization
+# Display the first few rows of the dataset
+print(data.head())
+# Check for missing values
+print(data.isnull().sum())
+
+# 5. Data Preprocessing
+# Handle missing values
+data['Age'].fillna(data['Age'].median(), inplace=True)  # Fill missing Age with median
+data['Embarked'].fillna(data['Embarked'].mode()[0], inplace=True)  # Fill missing Embarked with mode
+
+# Convert 'Sex' into numerical values
+data['Sex'] = data['Sex'].map({'male': 0, 'female': 1})
+
+# Convert 'Embarked' into numerical values
+data['Embarked'] = data['Embarked'].map({'C': 0, 'Q': 1, 'S': 2})
+
+# 6. Feature Engineering
+data['FamilySize'] = data['SibSp'] + data['Parch'] + 1  # Family size calculation
+data['Title'] = data['Name'].str.extract(' ([A-Za-z]+)\.', expand=False)
+
+# Encode 'Title' using one-hot encoding
+title_dummies = pd.get_dummies(data['Title'], prefix='Title')
+data = pd.concat([data, title_dummies], axis=1)
+
+# Drop non-numeric columns
+data.drop(['Name', 'Ticket', 'Title', 'Cabin'], axis=1, inplace=True, errors='ignore')  # 'Cabin' dropped only if it exists
+
+# Check the cleaned data
+print(data.head())
+
+# Visualizations
+
+# 1. Bar Plot for Survival Count by Gender
+plt.figure(figsize=(10, 5))
+sns.countplot(data=data, x='Sex', hue='Survived', palette='Set1')
+plt.title('Survival Count by Gender')
+plt.xticks(ticks=[0, 1], labels=['Male', 'Female'])
+plt.xlabel('Gender')
+plt.ylabel('Count')
+plt.legend(title='Survived', labels=['No', 'Yes'])
+plt.show()
+
+# 2. Bar Plot for Survival Count by Class
+plt.figure(figsize=(10, 5))
+sns.countplot(data=data, x='Pclass', hue='Survived', palette='Set2')
+plt.title('Survival Count by Class')
+plt.xlabel('Passenger Class')
+plt.ylabel('Count')
+plt.legend(title='Survived', labels=['No', 'Yes'])
+plt.show()
+
+# 3. Age Distribution of Survived vs Not Survived
+plt.figure(figsize=(10, 5))
+sns.histplot(data=data, x='Age', hue='Survived', multiple='stack', kde=True, palette='crest', bins=30)
+plt.title('Age Distribution of Survived vs Not Survived')
+plt.xlabel('Age')
+plt.ylabel('Count')
+plt.legend(title='Survived', labels=['No', 'Yes'])
+plt.show()
+
+# 4. Count Plot for Embarked vs Survived
+plt.figure(figsize=(10, 5))
+sns.countplot(data=data, x='Embarked', hue='Survived', palette='pastel')
+plt.title('Count of Passengers by Embarked Location')
+plt.xticks(ticks=[0, 1, 2], labels=['C', 'Q', 'S'])
+plt.xlabel('Embarked')
+plt.ylabel('Count')
+plt.legend(title='Survived', labels=['No', 'Yes'])
+plt.show()
+
+# 7. Splitting the Data
+from sklearn.model_selection import train_test_split
+
+# Define features and target variable
+X = data.drop(columns=['Survived', 'PassengerId'])  # Drop 'PassengerId' and 'Survived' (target)
+y = data['Survived']
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 8. Model Building
+from sklearn.ensemble import RandomForestClassifier
+
+# Initialize the model
+model = RandomForestClassifier(random_state=42)
+
+# Fit the model
+model.fit(X_train, y_train)
+
+# 9. Model Evaluation
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
+# Make predictions
+y_pred = model.predict(X_test)
+
+# Evaluate the model
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy * 100:.2f}%")
+
+# Confusion Matrix
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+# Classification Report
+print("Classification Report:")
+print(classification_report(y_test, y_pred))
