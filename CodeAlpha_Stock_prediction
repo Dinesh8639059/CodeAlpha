@@ -1,0 +1,151 @@
+# Importing necessary libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import MinMaxScaler
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+# 1. Load the dataset
+data = pd.read_csv('AAPL.csv')  # Ensure the dataset is in the same directory or provide the correct path
+
+# 2. Data Preprocessing
+# Set 'date' as the index and convert it to datetime
+data['date'] = pd.to_datetime(data['date'])
+data.set_index('date', inplace=True)
+
+# Select relevant columns for analysis
+data = data[['close', 'open', 'high', 'low', 'volume']]  # Selecting multiple columns for visualization
+
+# Display the first few rows of the dataset
+print(data.head())
+
+# Normalize the 'close' data only
+scaler = MinMaxScaler(feature_range=(0, 1))
+scaled_data = scaler.fit_transform(data[['close']])  # Only scale the 'close' column
+
+# 3. Data Visualization
+# Visualizing the stock price data
+plt.figure(figsize=(12, 6))
+plt.plot(data['close'], label='Close Price History', color='blue')
+plt.title('AAPL Stock Price History')
+plt.xlabel('Date')
+plt.ylabel('Close Price (USD)')
+plt.legend()
+plt.show()
+
+# Heatmap of the dataset correlations
+plt.figure(figsize=(10, 6))
+correlation = data.corr()
+sns.heatmap(correlation, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('Correlation Heatmap')
+plt.show()
+
+# Visualizing the distribution of the closing prices
+plt.figure(figsize=(12, 6))
+sns.histplot(data['close'], bins=30, kde=True)
+plt.title('Distribution of Closing Prices')
+plt.xlabel('Close Price (USD)')
+plt.ylabel('Frequency')
+plt.show()
+
+# Boxplot for the closing prices
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=data[['close']])
+plt.title('Box Plot of Closing Prices')
+plt.xlabel('Closing Price (USD)')
+plt.show()
+
+# Pairplot for the numerical attributes
+sns.pairplot(data)
+plt.suptitle('Pairplot of AAPL Stock Attributes', y=1.02)
+plt.show()
+
+# Time series decomposition
+result = seasonal_decompose(data['close'], model='additive', period=30)
+result.plot()
+plt.suptitle('Time Series Decomposition of AAPL Closing Prices', y=1.02)
+plt.show()
+
+# 4. Train-Test Split
+train_size = int(len(scaled_data) * 0.8)  # 80% for training
+train_data = scaled_data[:train_size]
+test_data = scaled_data[train_size:]
+
+# Create the training dataset
+def create_dataset(data, time_step=1):
+    X, y = [], []
+    for i in range(len(data) - time_step - 1):
+        X.append(data[i:(i + time_step), 0])
+        y.append(data[i + time_step, 0])
+    return np.array(X), np.array(y)
+
+# Reshape into X=t and y=t+1
+time_step = 60  # Using 60 previous days to predict the next day
+X_train, y_train = create_dataset(train_data, time_step)
+X_test, y_test = create_dataset(test_data, time_step)
+
+# Reshape input to be [samples, time steps, features]
+X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
+X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
+
+# 5. LSTM Model Building
+model = keras.Sequential()
+model.add(layers.LSTM(50, return_sequences=True, input_shape=(X_train.shape[1], 1)))
+model.add(layers.LSTM(50, return_sequences=False))
+model.add(layers.Dense(25))
+model.add(layers.Dense(1))
+
+# Compile the model
+model.compile(optimizer='adam', loss='mean_squared_error')
+
+# 6. Model Training (Reduced epochs and changed batch size)
+model.fit(X_train, y_train, batch_size=16, epochs=5)  # Reduced to 5 epochs
+
+# 7. Model Evaluation
+# Predicting the stock prices
+train_predict = model.predict(X_train)
+test_predict = model.predict(X_test)
+
+# Inverse transform to get actual prices
+train_predict = scaler.inverse_transform(train_predict)  # Now this matches the shape
+test_predict = scaler.inverse_transform(test_predict)
+
+# 8. Plotting the results
+plt.figure(figsize=(12, 6))
+# Plot original data
+plt.plot(data.index, data['close'], label='Original Price', color='blue')
+# Plot training predictions
+train_index = data.index[:len(train_predict)]
+plt.plot(train_index, train_predict, label='Train Predictions', color='orange')
+
+# Adjusting the test_index to match the length of test_predict
+test_index = data.index[len(train_predict) + (time_step + 1):len(train_predict) + (time_step + 1) + len(test_predict)]
+plt.plot(test_index, test_predict, label='Test Predictions', color='green')
+plt.title('Stock Price Prediction using LSTM')
+plt.xlabel('Date')
+plt.ylabel('Price (USD)')
+plt.legend()
+plt.show()
+
+# 9. Additional Visualizations
+# Create a 'Month' column from the date index for better grouping
+data['Month'] = data.index.month
+
+# Pie chart for average closing prices by month
+avg_price_by_month = data.groupby('Month')['close'].mean()
+plt.figure(figsize=(8, 8))
+plt.pie(avg_price_by_month, labels=avg_price_by_month.index.astype(str), autopct='%1.1f%%', startangle=140)
+plt.title('Average Closing Prices by Month')
+plt.axis('equal')  # Equal aspect ratio ensures that pie chart is circular.
+plt.show()
+
+# Box plot for closing prices
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=data['close'])
+plt.title('Box Plot of Closing Prices')
+plt.xlabel('Closing Price (USD)')
+plt.show()
