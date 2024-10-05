@@ -1,0 +1,86 @@
+# Step-by-Step Code for Linear Regression on Housing Data
+
+# Importing libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import OneHotEncoder
+
+# Step 1: Load the dataset
+# Assuming you've downloaded the CSV from Kaggle or similar source
+data = pd.read_csv('housing.csv')  # Adjust filename as per your dataset
+
+# Step 2: Data Exploration
+print(data.head())  # Display first few rows of the dataset
+print(data.info())  # Get summary information about the dataset
+print(data.describe())  # Get statistical description
+
+# Step 3: Data Preprocessing
+# Check for missing values
+print(data.isnull().sum())  # Summarize missing values
+
+# Fill missing values (for simplicity, we can use the median strategy)
+data['total_bedrooms'].fillna(data['total_bedrooms'].median(), inplace=True)
+
+# Handle categorical variables using OneHotEncoding for 'ocean_proximity'
+encoder = OneHotEncoder()
+encoded_columns = encoder.fit_transform(data[['ocean_proximity']]).toarray()
+encoded_df = pd.DataFrame(encoded_columns, columns=encoder.get_feature_names_out(['ocean_proximity']))
+
+# Drop the original 'ocean_proximity' column and concatenate the encoded columns
+data = data.drop('ocean_proximity', axis=1)
+data = pd.concat([data, encoded_df], axis=1)
+
+# Step 4: Define features and target variable
+X = data.drop('median_house_value', axis=1)  # Features (input variables)
+y = data['median_house_value']  # Target variable (house price)
+
+# Step 5: Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Step 6: Build the Linear Regression model
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# Step 7: Make predictions
+y_pred = model.predict(X_test)
+
+# Step 8: Evaluate the model
+r2 = r2_score(y_test, y_pred)
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+
+print(f"R-squared: {r2:.2f}")
+print(f"Mean Squared Error: {mse:.2f}")
+print(f"Root Mean Squared Error: {rmse:.2f}")
+
+# Step 9: Visualize the results
+
+# Plotting Actual vs Predicted values
+plt.figure(figsize=(10,6))
+plt.scatter(y_test, y_pred, color='blue', edgecolor='k')
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
+plt.xlabel('Actual House Value')
+plt.ylabel('Predicted House Value')
+plt.title('Actual vs Predicted House Value')
+plt.grid(True)
+plt.show()
+
+# Correlation heatmap
+plt.figure(figsize=(12,8))
+corr_matrix = data.corr()
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+plt.title('Correlation Matrix')
+plt.show()
+
+# Distribution of house values
+plt.figure(figsize=(8,6))
+sns.histplot(y, bins=30, kde=True, color='purple')
+plt.title('Distribution of Median House Values')
+plt.xlabel('Median House Value')
+plt.ylabel('Frequency')
+plt.show()
